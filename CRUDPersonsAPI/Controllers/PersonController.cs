@@ -10,24 +10,17 @@ using CRUDPersonsAPI.models;
 using CRUDPersonsAPI.Services;
 using CRUDPersonsAPI.ViewModels;
 using static Microsoft.EntityFrameworkCore.DbLoggerCategory;
+using CRUDPersonsAPI.Features;
 
 namespace CRUDPersonsAPI.Controllers
 {
-    [Route("api/[controller]")]
+    [Route("api/v1/[controller]")]
     [ApiController]
     public class PersonController : ControllerBase
     {
        private readonly PersonService _personService;
 
-        public string draw = "";
-        public string start = "";
-        public string length = "";
-        public string sortColumn = "";
-        public string searchValue = "";
-        public int pageSize, skip, recordsTotal;
-
-
-        public PersonController(PersonService service)
+       public PersonController(PersonService service)
         {
             _personService = service;
         }
@@ -40,10 +33,9 @@ namespace CRUDPersonsAPI.Controllers
         //    return Ok(new { data = await _personService.GetAllPersons() });
         //}
 
-        [HttpPost("")]
-        public async Task<IActionResult> GetPersonsQuery()
-        {
-                 
+        [HttpPost("datatable")]
+        public async Task<IActionResult> GetPersonsDataTable()
+        {                 
             var draw = Request.Form["draw"].FirstOrDefault();
             var start = Request.Form["start"].FirstOrDefault();
             var length = Request.Form["length"].FirstOrDefault();
@@ -52,81 +44,90 @@ namespace CRUDPersonsAPI.Controllers
             var sortColumnDir = Request.Form["order[0][dir]"].FirstOrDefault();
             var searchValue = Request.Form["search[Value]"].FirstOrDefault();
 
-            pageSize = length != null ? Convert.ToInt32(length) : 0;
-            skip = start != null ? Convert.ToInt32(start) : 0;
-            recordsTotal = 0;
+            var pageSize = length != null ? Convert.ToInt32(length) : 0;
+            var skip = start != null ? Convert.ToInt32(start) : 0;
+            var recordsTotal = 0;
 
+            // Filtrar en la base de datos
             IQueryable<TbPersona> query =   _personService.GetAllQueryablePerson();
 
             if (!string.IsNullOrEmpty(searchValue))
             {
                 query = query.Where(temp => temp.Nombre.Contains(searchValue));
-            }          
+            }
+            // Ordenar en la base de datos
+
+            //sortColumnDir = desc - asc
+            query = query.OrderByDescending(temp  => temp.Id);
+
+            if (!string.IsNullOrEmpty(sortColumn) && !string.IsNullOrEmpty(sortColumnDir))
+            {
+                if (sortColumn.Contains("name", StringComparison.OrdinalIgnoreCase))
+                {
+                    if (sortColumnDir == "asc")
+                        query = query.OrderBy(temp => temp.Nombre);
+                    else if (sortColumnDir == "desc")
+                    {
+                        query = query.OrderByDescending(temp => temp.Nombre);
+                    }
+                }
+                else if (sortColumn.Contains("age", StringComparison.OrdinalIgnoreCase))
+                {
+                    if (sortColumnDir == "asc")
+                    {
+                        query = query.OrderBy(temp => temp.Fnacimiento);
+                    }
+                    else if (sortColumnDir == "desc")
+                    {
+                        query = query.OrderByDescending(temp => temp.Fnacimiento);
+                    }
+                }
+            }
+
 
             try
             {
-                              
-             
-                recordsTotal = query.Count();
-                var data = query.Skip(skip).Take(pageSize).AsEnumerable();
+                // Contar el total de registros
+                recordsTotal = await query.CountAsync();
 
-                var queryModel = data.Select(temp => new PersonTableViewModel
+                // Paginación en la base de datos
+                query = query.Skip(skip).Take(pageSize);
+
+                // Traer los datos paginados a la memoria
+                var personList = await query.ToListAsync();
+
+                var queryModel = personList.Select(temp => new PersonTableViewModel
                 {
                     Id = temp.Id,
                     Name = temp.Nombre,
                     Age = Convert.ToInt32(((DateTime.Now - temp.Fnacimiento.Value).TotalDays) / 365.25)
                 });
 
-                //sortColumnDir = desc - asc
-                if (!string.IsNullOrEmpty(sortColumn) && !string.IsNullOrEmpty(sortColumnDir))
-                {
-                    if (sortColumn.Contains("nombre", StringComparison.OrdinalIgnoreCase))
-                    {
-                        if (sortColumnDir == "asc")
-                            queryModel = queryModel.OrderBy(temp => temp.Name);
-                        else if (sortColumnDir == "desc")
-                        {
-                            queryModel = queryModel.OrderByDescending(temp => temp.Name);
-                        }
-                    }
-                    else if (sortColumn.Contains("edad", StringComparison.OrdinalIgnoreCase))
-                    {
-                        if (sortColumnDir == "asc")
-                        {
-                            queryModel = queryModel.OrderBy(temp => temp.Age);
-                        }
-                        else if (sortColumnDir == "desc")
-                        {
-                            queryModel = queryModel.OrderByDescending(temp => temp.Age);
-                        }
-                    }
+                
 
-                }
                 return Ok(new { draw, recordsFiltered = recordsTotal, recordsTotal, data = queryModel });
-
             }
             catch (Exception ex)
             {
-
                 throw;
-            }
-
-          
+            }          
         }
 
+
+
         // GET: api/Person/5
-        //[HttpGet("{id}")]
-        //public async Task<ActionResult<TbPersona>> GetTbPersona(int id)
-        //{
-        //    var tbPersona = await _personService.TbPersonas.FindAsync(id);
+        [HttpGet("{id}")]
+        public async Task<ActionResult<TbPersona>> GetPerson(int id)
+        {
+            TbPersona? tbPersona = await _personService.GetPersonByPersonId(id);
 
-        //    if (tbPersona == null)
-        //    {
-        //        return NotFound();
-        //    }
+            if (tbPersona == null)
+            {
+                return NotFound();
+            }
 
-        //    return tbPersona;
-        //}
+            return tbPersona;
+        }
 
         //// PUT: api/Person/5
         //// To protect from overposting attacks, see https://go.microsoft.com/fwlink/?linkid=2123754
@@ -159,16 +160,17 @@ namespace CRUDPersonsAPI.Controllers
         //    return NoContent();
         //}
 
-        //// POST: api/Person
-        //// To protect from overposting attacks, see https://go.microsoft.com/fwlink/?linkid=2123754
-        //[HttpPost]
-        //public async Task<ActionResult<TbPersona>> PostTbPersona(TbPersona tbPersona)
-        //{
-        //    _personService.TbPersonas.Add(tbPersona);
-        //    await _personService.SaveChangesAsync();
-
-        //    return CreatedAtAction("GetTbPersona", new { id = tbPersona.Id }, tbPersona);
-        //}
+        // POST: api/Person
+        // To protect from overposting attacks, see https://go.microsoft.com/fwlink/?linkid=2123754
+       
+        [HttpPost]
+        public async Task<IActionResult> AddPerson(TbPersona? tbPersona)
+        {
+            TbPersona person = await _personService.AddPerson(tbPersona);          
+             
+            
+            return  Ok(ResponseApiService.Response(StatusCodes.Status200OK, person, "Ejecución exitosa" )) ;
+        }
 
         //// DELETE: api/Person/5
         //[HttpDelete("{id}")]
