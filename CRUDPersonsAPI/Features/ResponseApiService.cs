@@ -19,7 +19,8 @@ namespace CRUDPersonsAPI.Features
 
             Success = success, 
                 Data = Data,
-                Message = Message
+                Message = Message,
+                StatusCode = StatusCode
             
             };
 

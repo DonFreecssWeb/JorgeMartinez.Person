@@ -1,5 +1,7 @@
-using CRUDPersonsAPI.Datos;
+using CRUDPersonsAPI.databasecontext;
+using CRUDPersonsAPI.Filters;
 using CRUDPersonsAPI.Services;
+using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
@@ -23,8 +25,26 @@ builder.Services.AddCors(options =>
     });
 });
 
-builder.Services.AddControllers();
+//swagger
+builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddSwaggerGen();
+
+var logger = builder.Services.BuildServiceProvider().GetRequiredService<ILogger<VerifySession2>>();
+
+builder.Services.AddControllers(options =>
+{
+    options.Filters.Add(new VerifySession2(logger,""));
+});
+
+builder.Services.AddTransient<JwtService>();
+
 var app = builder.Build();
+
+if (app.Environment.IsDevelopment())
+{
+    app.UseSwagger();
+    app.UseSwaggerUI();
+}
 
 app.MapControllers();
 
@@ -32,12 +52,7 @@ app.UseCors("seguro");
 
 // Configure the HTTP request pipeline.
 
-app.MapGet("/", (PersonService service) =>
-{    
-
-    return Results.Json(new {data = service.GetAllPersons() });
-});
-
+ 
 
 
 app.Run();

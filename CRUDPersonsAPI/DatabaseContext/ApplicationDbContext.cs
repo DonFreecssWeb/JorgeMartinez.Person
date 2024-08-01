@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using CRUDPersonsAPI.models;
 using Microsoft.EntityFrameworkCore;
 
-namespace CRUDPersonsAPI.Datos;
+namespace CRUDPersonsAPI.databasecontext;
 
 public partial class ApplicationDbContext : DbContext
 {
@@ -17,6 +17,10 @@ public partial class ApplicationDbContext : DbContext
     }
 
     public virtual DbSet<TbPersona> TbPersonas { get; set; }
+
+    public virtual DbSet<TbUsuario> TbUsuarios { get; set; }
+
+  
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -36,6 +40,21 @@ public partial class ApplicationDbContext : DbContext
                 .HasMaxLength(50)
                 .IsUnicode(false)
                 .HasColumnName("nombre");
+        });
+
+        modelBuilder.Entity<TbUsuario>(entity =>
+        {
+            entity.ToTable("tb_usuario");
+
+            entity.Property(e => e.Id).HasColumnName("id");
+            entity.Property(e => e.Password)
+                .HasMaxLength(50)
+                .IsUnicode(false)
+                .HasColumnName("password");
+            entity.Property(e => e.Username)
+                .HasMaxLength(50)
+                .IsUnicode(false)
+                .HasColumnName("username");
         });
 
         OnModelCreatingPartial(modelBuilder);

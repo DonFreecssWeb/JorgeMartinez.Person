@@ -1,4 +1,4 @@
-﻿namespace CRUDPersonsAPI.ViewModels
+﻿namespace CRUDPersonsAPI.DTO
 {
     public class PersonTableViewModel
     {

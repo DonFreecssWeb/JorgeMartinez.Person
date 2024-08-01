@@ -5,17 +5,21 @@ using System.Threading.Tasks;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using CRUDPersonsAPI.Datos;
+
 using CRUDPersonsAPI.models;
 using CRUDPersonsAPI.Services;
-using CRUDPersonsAPI.ViewModels;
-using static Microsoft.EntityFrameworkCore.DbLoggerCategory;
+using CRUDPersonsAPI.DTO;
+
 using CRUDPersonsAPI.Features;
+using CRUDPersonsAPI.Exception;
+using CRUDPersonsAPI.Filters;
 
 namespace CRUDPersonsAPI.Controllers
 {
-    [Route("api/v1/[controller]")]
+    [Route("api/v1/person")]
     [ApiController]
+    [TypeFilter(typeof(ExceptionManager))]
+    [TypeFilter(typeof(VerifySession2))]
     public class PersonController : ControllerBase
     {
        private readonly PersonService _personService;
@@ -25,13 +29,14 @@ namespace CRUDPersonsAPI.Controllers
             _personService = service;
         }
 
-        // GET: api/Person
-        //[HttpGet]
-        //public async Task<IActionResult> GetPersons()
-        //{
+       //GET: api/Person
+       [HttpGet]
+        public async Task<IActionResult> GetPersons()
+        {
+            var data = await _personService.GetAllPersons();
 
-        //    return Ok(new { data = await _personService.GetAllPersons() });
-        //}
+            return Ok(ResponseApiService.Response(StatusCodes.Status200OK,data));
+        }
 
         [HttpPost("datatable")]
         public async Task<IActionResult> GetPersonsDataTable()
@@ -84,9 +89,6 @@ namespace CRUDPersonsAPI.Controllers
                 }
             }
 
-
-            try
-            {
                 // Contar el total de registros
                 recordsTotal = await query.CountAsync();
 
@@ -101,96 +103,71 @@ namespace CRUDPersonsAPI.Controllers
                     Id = temp.Id,
                     Name = temp.Nombre,
                     Age = Convert.ToInt32(((DateTime.Now - temp.Fnacimiento.Value).TotalDays) / 365.25)
-                });
+                });                
 
-                
-
-                return Ok(new { draw, recordsFiltered = recordsTotal, recordsTotal, data = queryModel });
-            }
-            catch (Exception ex)
-            {
-                throw;
-            }          
+                return Ok(new { draw, recordsFiltered = recordsTotal, recordsTotal, data = queryModel });            
+                   
         }
 
 
 
-        // GET: api/Person/5
-        [HttpGet("{id}")]
-        public async Task<ActionResult<TbPersona>> GetPerson(int id)
+        // GET: api/v1/Person/5
+        [HttpGet("{userId}")]
+        public async Task<IActionResult> ShowPerson(int userId)
         {
-            TbPersona? tbPersona = await _personService.GetPersonByPersonId(id);
+            
+            if (userId == 0)
+                return BadRequest(ResponseApiService.Response(StatusCodes.Status400BadRequest));
 
-            if (tbPersona == null)
+
+            TbPersona? data = await _personService.GetPersonByPersonId(userId);
+
+            if (data == null)
             {
-                return NotFound();
+                return NotFound(ResponseApiService.Response(StatusCodes.Status404NotFound));
             }
 
-            return tbPersona;
+            return Ok(ResponseApiService.Response(StatusCodes.Status200OK,data));
         }
 
-        //// PUT: api/Person/5
-        //// To protect from overposting attacks, see https://go.microsoft.com/fwlink/?linkid=2123754
-        //[HttpPut("{id}")]
-        //public async Task<IActionResult> PutTbPersona(int id, TbPersona tbPersona)
-        //{
-        //    if (id != tbPersona.Id)
-        //    {
-        //        return BadRequest();
-        //    }
+        // PUT: api/v1/Person/5
+        // To protect from overposting attacks, see https://go.microsoft.com/fwlink/?linkid=2123754
+        [HttpPut]
+        public async Task<IActionResult> EditPerson(TbPersona person)
+        {        
+            var data = await _personService.UpdatePerson(person);
 
-        //    _personService.Entry(tbPersona).State = EntityState.Modified;
-
-        //    try
-        //    {
-        //        await _personService.SaveChangesAsync();
-        //    }
-        //    catch (DbUpdateConcurrencyException)
-        //    {
-        //        if (!TbPersonaExists(id))
-        //        {
-        //            return NotFound();
-        //        }
-        //        else
-        //        {
-        //            throw;
-        //        }
-        //    }
-
-        //    return NoContent();
-        //}
+            return Ok(ResponseApiService.Response(StatusCodes.Status200OK, data));
+        }
 
         // POST: api/Person
         // To protect from overposting attacks, see https://go.microsoft.com/fwlink/?linkid=2123754
-       
+
         [HttpPost]
-        public async Task<IActionResult> AddPerson(TbPersona? tbPersona)
+        public async Task<IActionResult> AddPerson(TbPersona tbPersona)
         {
-            TbPersona person = await _personService.AddPerson(tbPersona);          
+          
+            TbPersona person = await _personService.AddPerson(tbPersona);         
              
             
-            return  Ok(ResponseApiService.Response(StatusCodes.Status200OK, person, "Ejecución exitosa" )) ;
+            return  StatusCode(StatusCodes.Status201Created ,ResponseApiService.Response(StatusCodes.Status201Created, person)) ;
         }
 
-        //// DELETE: api/Person/5
-        //[HttpDelete("{id}")]
-        //public async Task<IActionResult> DeleteTbPersona(int id)
-        //{
-        //    var tbPersona = await _personService.TbPersonas.FindAsync(id);
-        //    if (tbPersona == null)
-        //    {
-        //        return NotFound();
-        //    }
+        // DELETE: api/Person/5
+        [HttpDelete("{userId}")]
+        public async Task<IActionResult> DeletePerson(int userId)
+        {
+            if (userId == 0)
+                return BadRequest(ResponseApiService.Response(StatusCodes.Status400BadRequest));
+            
+            var data = await _personService.DeletePerson(userId);
 
-        //    _personService.TbPersonas.Remove(tbPersona);
-        //    await _personService.SaveChangesAsync();
+            if (data == false)
+                return NotFound(ResponseApiService.Response(StatusCodes.Status404NotFound,data));
 
-        //    return NoContent();
-        //}
+            return Ok(ResponseApiService.Response(StatusCodes.Status200OK,data));
+        }
 
-        //private bool TbPersonaExists(int id)
-        //{
-        //    return _personService.TbPersonas.Any(e => e.Id == id);
-        //}
+        
     }
 }
